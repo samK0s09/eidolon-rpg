@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 ╔══════════════════════════════════════════════════════════╗
@@ -718,7 +719,7 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name="⚔️ /criar | EIDOLON RPG"))
 
 if __name__ == "__main__":
-    TOKEN = "MTUxNDM3ODA3NDAxODQxNDcwMg.GlKZ0W.KreKsHPvqzOUtVb-MLWQMHAj-hd7httVdMFgo4"
+    TOKEN = os.getenv("DISCORD_TOKEN")
     print("⚔️ Iniciando EIDOLON RPG...\n")
     try:
         bot.run(TOKEN)
