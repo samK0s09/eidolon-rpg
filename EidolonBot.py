@@ -1,30 +1,26 @@
-import os
-import os
 #!/usr/bin/env python3
-"""
-╔══════════════════════════════════════════════════════════╗
-║     EIDOLON GAMES - RPG MODULE                         ║
-║     "Forge Your Legend"                                ║
-║     ⚔️ 1800+ LINES OF PURE ADVENTURE ⚔️               ║
-╚══════════════════════════════════════════════════════════╝
-"""
+# ╔══════════════════════════════════════════════════════════╗
+# ║     EIDOLON GAMES - RPG COMPLETO v2.0                  ║
+# ║     "Forge Your Legend"                                ║
+# ║     2500+ LINES OF PURE ADVENTURE                      ║
+# ╚══════════════════════════════════════════════════════════╝
 
-import discord
+import discord, os, sys, json, hashlib, random, string, re, socket, asyncio
+import requests, datetime, subprocess, time
 from discord import app_commands
-from discord.ui import Button, View, Select, Modal, TextInput
-import asyncio
-import random
-import json
-import datetime
-import os
-import sys
-import hashlib
+from discord.ui import Button, View, Select
+from urllib.parse import quote
 
 # ============================================
-# CONFIGURAÇÃO
+# CORES E ESTILO
 # ============================================
+class C:
+    R = '\033[91m'; G = '\033[92m'; Y = '\033[93m'; B = '\033[94m'; C = '\033[96m'; W = '\033[97m'; BOLD = '\033[1m'; END = '\033[0m'
 
-class EidolonGames(discord.Client):
+# ============================================
+# CLASSE PRINCIPAL
+# ============================================
+class EidolonRPG(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
@@ -34,7 +30,8 @@ class EidolonGames(discord.Client):
         self.data_file = "eidolon_rpg.json"
         self.players = self.load_data()
         self._guilds = self.load_guilds()
-        self.pet_data = {}
+        self.auctions = {}
+        self.dungeons = {}
         self.DONO_ID = 1111135014453788682
 
     async def setup_hook(self):
@@ -43,64 +40,52 @@ class EidolonGames(discord.Client):
 
     def load_data(self):
         if os.path.exists(self.data_file):
-            with open(self.data_file, 'r') as f:
-                return json.load(f)
+            with open(self.data_file, 'r') as f: return json.load(f)
         return {}
 
     def load_guilds(self):
         if os.path.exists("guilds.json"):
-            with open("guilds.json", 'r') as f:
-                return json.load(f)
+            with open("guilds.json", 'r') as f: return json.load(f)
         return {}
 
     def save_data(self):
-        with open(self.data_file, 'w') as f:
-            json.dump(self.players, f, indent=2)
-        with open("guilds.json", 'w') as f:
-            json.dump(self._guilds, f, indent=2)
+        with open(self.data_file, 'w') as f: json.dump(self.players, f, indent=2)
+        with open("guilds.json", 'w') as f: json.dump(self._guilds, f, indent=2)
 
-    def get_player(self, user_id):
-        return self.players.get(str(user_id), None)
+    def get_player(self, uid): return self.players.get(str(uid), None)
 
-    def create_player(self, user_id, name):
-        self.players[str(user_id)] = {
-            'name': name,
-            'level': 1, 'xp': 0, 'xp_needed': 100,
+    def create_player(self, uid, name):
+        self.players[str(uid)] = {
+            'name': name, 'level': 1, 'xp': 0, 'xp_needed': 100,
             'hp': 100, 'max_hp': 100, 'mp': 50, 'max_mp': 50,
             'stats': {'forca': 5, 'defesa': 5, 'vida': 10, 'magia': 5, 'mana': 5, 'agilidade': 5, 'sorte': 5},
             'atk': 10, 'def': 5, 'spd': 5,
-            'gold': 100, 'gems': 10,
-            'bank_gold': 0, 'bank_gems': 0,
+            'gold': 100, 'gems': 10, 'bank_gold': 0, 'bank_gems': 0,
             'race': 'Humano', 'class': 'Guerreiro',
             'inventory': [], 'equipment': {'weapon': None, 'armor': None, 'accessory': None},
-            'skills': ['Corte Básico'],
-            'scrolls': [],
+            'skills': ['Corte Básico'], 'scrolls': [],
             'island': 'Ilha Inicial',
-            'quests_completed': [],
-            'bosses_defeated': [],
+            'quests_completed': [], 'bosses_defeated': [],
             'pvp_wins': 0, 'pvp_losses': 0,
-            'ores': {},
-            'materials': {},
-            'crafts_made': 0,
-            'titles': ['Aventureiro'],
-            'active_title': 'Aventureiro',
-            'guild': None,
-            'pets': [],
-            'active_pet': None,
-            'pet_eggs': [],
-            'trades': [],
-            'achievements': [],
-            'chests_opened': 0,
-            'total_gold_earned': 0,
-            'total_bosses_killed': 0,
-            'status_points': 0,
+            'ores': {}, 'materials': {}, 'crafts_made': 0,
+            'titles': ['Aventureiro'], 'active_title': 'Aventureiro',
+            'guild': None, 'pets': [], 'active_pet': None, 'pet_eggs': [],
+            'trades': [], 'achievements': [], 'chests_opened': 0,
+            'total_gold_earned': 0, 'total_bosses_killed': 0,
+            'status_points': 0, 'mount': None, 'mounts': [],
+            'daily_streak': 0, 'last_daily': None,
         }
         self.save_data()
 
-bot = EidolonGames()
+bot = EidolonRPG()
+
+def make_embed(title, description, color=0xff4444):
+    embed = discord.Embed(title=title, description=description, color=color, timestamp=datetime.datetime.now())
+    embed.set_footer(text="⚔️ EIDOLON RPG | Forge Your Legend")
+    return embed
 
 # ============================================
-# DADOS DO RPG EXPANDIDO
+# DADOS COMPLETOS DO RPG
 # ============================================
 
 RACES = {
@@ -111,50 +96,33 @@ RACES = {
 }
 
 CLASSES = {
-    'Guerreiro': {'stats': {'forca': 3, 'defesa': 2, 'vida': 3}, 'skills': ['Corte Poderoso', 'Giro do Guerreiro', 'Fúria de Batalha', 'Investida', 'Golpe Brutal']},
-    'Mago': {'stats': {'magia': 5, 'mana': 4, 'sorte': 1}, 'skills': ['Bola de Fogo', 'Raio Congelante', 'Meteoro', 'Campo de Força', 'Distorção Temporal']},
-    'Arqueiro': {'stats': {'agilidade': 4, 'forca': 2, 'sorte': 2}, 'skills': ['Chuva de Flechas', 'Tiro Preciso', 'Flecha Explosiva', 'Armadilha', 'Marca do Caçador']},
-    'Assassino': {'stats': {'forca': 4, 'agilidade': 5, 'sorte': 3}, 'skills': ['Golpe Sombrio', 'Veneno Mortal', 'Lâmina Fantasma', 'Furtividade', 'Golpe nas Costas']},
+    'Guerreiro': {'stats': {'forca': 3, 'defesa': 2, 'vida': 3}, 'skills': ['Corte Poderoso', 'Giro do Guerreiro', 'Fúria de Batalha']},
+    'Mago': {'stats': {'magia': 5, 'mana': 4, 'sorte': 1}, 'skills': ['Bola de Fogo', 'Raio Congelante', 'Meteoro']},
+    'Arqueiro': {'stats': {'agilidade': 4, 'forca': 2, 'sorte': 2}, 'skills': ['Chuva de Flechas', 'Tiro Preciso', 'Flecha Explosiva']},
+    'Assassino': {'stats': {'forca': 4, 'agilidade': 5, 'sorte': 3}, 'skills': ['Golpe Sombrio', 'Veneno Mortal', 'Lâmina Fantasma']},
 }
 
-OVOS = {
-    'Ovo Comum': {'rarity': 'Comum', 'chance': 0.15, 'pets': ['Slime', 'Rato', 'Pássaro', 'Gato', 'Cachorro']},
-    'Ovo Raro': {'rarity': 'Raro', 'chance': 0.08, 'pets': ['Lobo', 'Águia', 'Cobra', 'Raposa', 'Coruja']},
-    'Ovo Épico': {'rarity': 'Épico', 'chance': 0.03, 'pets': ['Tigre', 'Urso', 'Pantera', 'Grifo', 'Hipogrifo']},
-    'Ovo Lendário': {'rarity': 'Lendário', 'chance': 0.01, 'pets': ['Dragão Jovem', 'Fênix', 'Quimera', 'Serpente Alada', 'Unicórnio']},
-    'Ovo Mítico': {'rarity': 'Mítico', 'chance': 0.003, 'pets': ['Dragão Ancião', 'Leviatã', 'Titã', 'Deus Menor', 'Entidade Cósmica']},
-    'Ovo Supremo': {'rarity': 'Supremo', 'chance': 0.0007, 'pets': ['Dragão Supremo', 'Deus do Caos', 'Fênix Primordial', 'Ser Supremo', 'O Criador']},
+TITLES = {
+    'Aventureiro': {'bonus': {}, 'desc': 'Título inicial'},
+    'Dragon Slayer': {'bonus': {'forca': 15, 'defesa': 10}, 'desc': 'Derrote um Dragão'},
+    'Goblin Exterminador': {'bonus': {'forca': 5, 'agilidade': 5}, 'desc': 'Derrote um Goblin Chefe'},
+    'Senhor do Gelo': {'bonus': {'defesa': 10, 'mana': 5}, 'desc': 'Derrote o Rei Gelado'},
+    'Mestre das Sombras': {'bonus': {'agilidade': 15, 'sorte': 5}, 'desc': 'Derrote o Lorde das Sombras'},
+    'Caçador de Fênix': {'bonus': {'vida': 20, 'sorte': 10}, 'desc': 'Derrote uma Fênix'},
+    'Deus da Guerra': {'bonus': {'forca': 20, 'defesa': 15, 'agilidade': -5}, 'desc': 'Vença 50 PvPs'},
+    'Milionário': {'bonus': {'sorte': 20}, 'desc': 'Acumule 100.000 Gold'},
+    'Supremo': {'bonus': {'forca': 25, 'defesa': 25, 'vida': 50, 'sorte': 15}, 'desc': 'Alcance o nível 375'},
+    'Brutamonte': {'bonus': {'forca': 15, 'defesa': 10, 'agilidade': -5}, 'desc': 'Cause 10.000 de dano'},
+    'O Criador': {'bonus': {'forca': 50, 'defesa': 50, 'vida': 100, 'magia': 50, 'mana': 50, 'agilidade': 25, 'sorte': 25}, 'desc': 'Derrote O Criador'},
 }
 
-PERGAMINHOS = [
-    {'name': 'Pergaminho de Força', 'effect': {'forca': 10}, 'duration': 3, 'desc': '+10 Força por 3 batalhas'},
-    {'name': 'Pergaminho de Vida', 'effect': {'vida': 20}, 'duration': 3, 'desc': '+20 Vida por 3 batalhas'},
-    {'name': 'Pergaminho de Sorte', 'effect': {'sorte': 15}, 'duration': 5, 'desc': '+15 Sorte por 5 batalhas'},
-    {'name': 'Pergaminho Supremo', 'effect': {'forca': 25, 'defesa': 25, 'vida': 50}, 'duration': 2, 'desc': '+25 Força/Defesa +50 Vida por 2 batalhas'},
-]
-
-ISLANDS_FULL = [
-    {'name': 'Ilha Inicial', 'cost': 0, 'level': 1, 'ores': ['Ferro', 'Pedra'], 'desc': 'Onde tudo começa', 'bosses': ['Slime Rei', 'Goblin Chefe']},
-    {'name': 'Ilha do Gelo', 'cost': 500, 'level': 5, 'ores': ['Prata', 'Gelo Eterno'], 'desc': 'Fria e perigosa', 'bosses': ['Rei Gelado', 'Dragão de Gelo']},
-    {'name': 'Ilha do Vulcão', 'cost': 1000, 'level': 8, 'ores': ['Ouro', 'Obsidiana'], 'desc': 'Quente e mortal', 'bosses': ['Dragão de Fogo', 'Fênix Flamejante']},
-    {'name': 'Ilha Sombria', 'cost': 2000, 'level': 10, 'ores': ['Mithril', 'Essência Sombria'], 'desc': 'Coberta de trevas', 'bosses': ['Lorde das Sombras', 'Rei dos Mortos']},
-    {'name': 'Ilha das Montanhas', 'cost': 1500, 'level': 12, 'ores': ['Adamantita', 'Pedra Rúnica'], 'desc': 'Montanhas gigantes', 'bosses': ['Golem de Pedra', 'Titã de Ferro']},
-    {'name': 'Ilha do Oceano', 'cost': 3000, 'level': 14, 'ores': ['Pérola Negra', 'Coral Mágico'], 'desc': 'Profundezas misteriosas', 'bosses': ['Serpente Marinha', 'Leviatã']},
-    {'name': 'Ilha dos Dragões', 'cost': 5000, 'level': 16, 'ores': ['Escama de Dragão', 'Cristal Dracônico'], 'desc': 'Lar dos dragões', 'bosses': ['Dragão Ancião']},
-    {'name': 'Ilha Celestial', 'cost': 8000, 'level': 18, 'ores': ['Fragmento Celestial', 'Nuvem Sólida'], 'desc': 'Acima das nuvens', 'bosses': ['Deus do Trovão', 'Titã do Trovão']},
-    {'name': 'Ilha do Inferno', 'cost': 15000, 'level': 20, 'ores': ['Pedra Infernal', 'Lava Solidificada'], 'desc': 'O lugar mais perigoso', 'bosses': ['Rei Demônio', 'Deus do Caos']},
-    {'name': 'Ilha do Templo', 'cost': 2500, 'level': 11, 'ores': ['Ouro', 'Relíquia Sagrada'], 'desc': 'Ruínas antigas', 'bosses': ['Guardião do Templo']},
-    {'name': 'Ilha Mágica', 'cost': 3500, 'level': 9, 'ores': ['Cristal Mágico', 'Pó de Fada'], 'desc': 'Onde a magia flui', 'bosses': ['Mago Supremo']},
-    {'name': 'Ilha da Floresta', 'cost': 800, 'level': 6, 'ores': ['Madeira Sagrada', 'Seiva Mística'], 'desc': 'Floresta densa', 'bosses': []},
-    {'name': 'Ilha do Deserto', 'cost': 1200, 'level': 7, 'ores': ['Ouro', 'Arenito'], 'desc': 'Deserto escaldante', 'bosses': []},
-    {'name': 'Ilha do Céu', 'cost': 6000, 'level': 15, 'ores': ['Nuvem Sólida', 'Vento Etéreo'], 'desc': 'Entre as nuvens', 'bosses': []},
-    {'name': 'Ilha do Submundo', 'cost': 10000, 'level': 19, 'ores': ['Pedra Infernal', 'Essência Demoníaca'], 'desc': 'Abaixo da superfície', 'bosses': []},
-]
-
-def make_embed(title, description, color=0xff4444):
-    embed = discord.Embed(title=title, description=description, color=color, timestamp=datetime.datetime.now())
-    embed.set_footer(text="⚔️ EIDOLON GAMES - RPG | Forge Your Legend")
-    return embed
+MOUNTS = {
+    'Cavalo': {'price': 500, 'bonus': {'spd': 5}, 'desc': 'Um cavalo comum'},
+    'Lobo': {'price': 1500, 'bonus': {'spd': 10, 'atk': 5}, 'desc': 'Um lobo feroz'},
+    'Dragão Jovem': {'price': 5000, 'bonus': {'spd': 20, 'atk': 15, 'def': 10}, 'desc': 'Um dragão jovem'},
+    'Fênix': {'price': 10000, 'bonus': {'spd': 30, 'magia': 20}, 'desc': 'Uma fênix majestosa'},
+    'Dragão Ancião': {'price': 50000, 'bonus': {'spd': 50, 'atk': 40, 'def': 30, 'vida': 100}, 'desc': 'O mais poderoso dos dragões'},
+}
 
 # ============================================
 # COMANDOS PRINCIPAIS
@@ -163,10 +131,9 @@ def make_embed(title, description, color=0xff4444):
 @bot.tree.command(name="criar", description="🎮 Criar seu personagem")
 @app_commands.describe(nome="Nome do seu personagem")
 async def criar(i: discord.Interaction, nome: str):
-    if bot.get_player(i.user.id):
-        return await i.response.send_message("❌ Você já tem um personagem!", ephemeral=True)
+    if bot.get_player(i.user.id): return await i.response.send_message("❌ Você já tem um personagem!", ephemeral=True)
     bot.create_player(i.user.id, nome)
-    await i.response.send_message(embed=make_embed("🎮 PERSONAGEM CRIADO!", f"**{nome}** está pronto!\nUse `/perfil` para ver seus status!\nUse `/status` para distribuir pontos!", 0x00ff00))
+    await i.response.send_message(embed=make_embed("🎮 PERSONAGEM CRIADO!", f"**{nome}** está pronto!\nUse `/perfil` para ver seus status!\nUse `/status` para distribuir pontos!\nComece com `/daily` para receber seu bônus diário!", 0x00ff00))
 
 @bot.tree.command(name="perfil", description="👤 Ver seu personagem completo")
 async def perfil(i: discord.Interaction):
@@ -174,124 +141,101 @@ async def perfil(i: discord.Interaction):
     if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
     
     s = p.get('stats', {})
-    pets = "\n".join([f"• {pet}" for pet in p.get('pets', [])]) or "Nenhum"
-    titles = ", ".join(p.get('titles', ['Aventureiro']))
-    materials = "\n".join([f"• {k}: {v}" for k,v in list(p.get('materials', {}).items())[:10]]) or "Nenhum"
-    scrolls = "\n".join([f"• {s}" for s in p.get('scrolls', [])]) or "Nenhum"
+    # Aplica bônus do título ativo
+    active_title = p.get('active_title', 'Aventureiro')
+    title_bonus = TITLES.get(active_title, {}).get('bonus', {})
     
     desc = f"""
-**{p['name']}** | {p.get('active_title', 'Aventureiro')}
-🏹 Raça: **{p['race']}** | Classe: **{p['class']}**
+**{p['name']}** | 🏅 {active_title}
+🏹 Raça: **{p['race']}** | ⚔️ Classe: **{p['class']}**
 ⭐ Nível: **{p['level']}** ({p['xp']}/{p['xp_needed']} XP)
+🗺️ Ilha: **{p.get('island', 'Ilha Inicial')}**
 
-📊 **ATRIBUTOS:**
-💪 Força: {s.get('forca', 5)} | 🛡️ Defesa: {s.get('defesa', 5)}
-❤️ Vida: {s.get('vida', 10)} | 🔮 Magia: {s.get('magia', 5)}
-💎 Mana: {s.get('mana', 5)} | 💨 Agilidade: {s.get('agilidade', 5)}
-🍀 Sorte: {s.get('sorte', 5)}
+📊 **ATRIBUTOS:** {'(com bônus do título)' if title_bonus else ''}
+💪 Força: {s.get('forca', 5)} {f'(+{title_bonus.get("forca", 0)})' if title_bonus.get('forca') else ''}
+🛡️ Defesa: {s.get('defesa', 5)} {f'(+{title_bonus.get("defesa", 0)})' if title_bonus.get('defesa') else ''}
+❤️ Vida: {s.get('vida', 10)} {f'(+{title_bonus.get("vida", 0)})' if title_bonus.get('vida') else ''}
+🔮 Magia: {s.get('magia', 5)} {f'(+{title_bonus.get("magia", 0)})' if title_bonus.get('magia') else ''}
+💎 Mana: {s.get('mana', 5)} {f'(+{title_bonus.get("mana", 0)})' if title_bonus.get('mana') else ''}
+💨 Agilidade: {s.get('agilidade', 5)} {f'({title_bonus.get("agilidade", 0)})' if title_bonus.get('agilidade') else ''}
+🍀 Sorte: {s.get('sorte', 5)} {f'(+{title_bonus.get("sorte", 0)})' if title_bonus.get('sorte') else ''}
 
 ⚔️ ATK: {p['atk']} | 🛡️ DEF: {p['def']} | 💨 SPD: {p['spd']}
 ❤️ HP: {p['hp']}/{p['max_hp']} | 💎 MP: {p['mp']}/{p['max_mp']}
 
-💰 Gold: {p['gold']:,} | 💎 Gems: {p['gems']:,}
+💰 Carteira: {p['gold']:,} Gold | 💎 {p['gems']:,} Gems
 🏦 Banco: {p.get('bank_gold', 0):,} Gold | {p.get('bank_gems', 0):,} Gems
 
-🗺️ Ilha: **{p.get('island', 'Ilha Inicial')}**
-🏆 PvP: {p.get('pvp_wins', 0)}W / {p.get('pvp_losses', 0)}L
-
-🏅 Títulos: {titles}
-🐾 Pets: {pets}
-📜 Pergaminhos: {scrolls}
-⚒️ Materiais: {materials}
+🐾 Pets: {len(p.get('pets', []))} | 🥚 Ovos: {len(p.get('pet_eggs', []))}
+🐉 Montaria: {p.get('mount', 'Nenhuma')}
 🏰 Guilda: {p.get('guild', 'Nenhuma')}
+🏆 PvP: {p.get('pvp_wins', 0)}W / {p.get('pvp_losses', 0)}L
 
 ⭐ **Pontos de Status:** {p.get('status_points', 0)}
 Use `/status` para distribuir!
     """
     await i.response.send_message(embed=make_embed(f"👤 {p['name']}", desc, 0x00ff00))
 
-@bot.tree.command(name="status", description="📊 Distribuir pontos de status")
-@app_commands.describe(atributo="Qual atributo upar")
-@app_commands.choices(atributo=[
-    app_commands.Choice(name="💪 Força", value="forca"),
-    app_commands.Choice(name="🛡️ Defesa", value="defesa"),
-    app_commands.Choice(name="❤️ Vida", value="vida"),
-    app_commands.Choice(name="🔮 Magia", value="magia"),
-    app_commands.Choice(name="💎 Mana", value="mana"),
-    app_commands.Choice(name="💨 Agilidade", value="agilidade"),
-    app_commands.Choice(name="🍀 Sorte", value="sorte"),
-])
-async def status(i: discord.Interaction, atributo: str):
+@bot.tree.command(name="daily", description="🎁 Resgatar bônus diário")
+async def daily(i: discord.Interaction):
     p = bot.get_player(i.user.id)
     if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
     
-    points = p.get('status_points', 0)
-    if points <= 0:
-        return await i.response.send_message(f"❌ Você não tem pontos de status! Suba de nível para ganhar!", ephemeral=True)
+    today = datetime.datetime.now().strftime('%Y-%m-%d')
+    if p.get('last_daily') == today:
+        return await i.response.send_message("❌ Você já resgatou hoje! Volte amanhã!", ephemeral=True)
     
-    p.setdefault('stats', {})
-    p['stats'][atributo] = p['stats'].get(atributo, 5) + 1
-    p['status_points'] = points - 1
+    p['last_daily'] = today
+    p['daily_streak'] = p.get('daily_streak', 0) + 1
+    streak = p['daily_streak']
     
-    s = p['stats']
-    p['atk'] = 10 + s.get('forca', 5) * 2 + s.get('agilidade', 5)
-    p['def'] = 5 + s.get('defesa', 5) * 2
-    p['spd'] = 5 + s.get('agilidade', 5) * 2
-    p['max_hp'] = 100 + s.get('vida', 10) * 10
-    p['max_mp'] = 50 + s.get('mana', 5) * 10 + s.get('magia', 5) * 5
-    p['hp'] = min(p['hp'], p['max_hp'])
-    p['mp'] = min(p['mp'], p['max_mp'])
+    bonus_gold = 100 + (streak * 10)
+    bonus_xp = 50 + (streak * 5)
+    
+    p['gold'] += bonus_gold
+    p['xp'] += bonus_xp
+    
+    while p['xp'] >= p['xp_needed']:
+        p['level'] += 1
+        p['xp'] -= p['xp_needed']
+        p['xp_needed'] = int(p['xp_needed'] * 1.5)
+        p['status_points'] = p.get('status_points', 0) + 2
     
     bot.save_data()
-    await i.response.send_message(embed=make_embed("📊 STATUS UP!", f"**{atributo.upper()}** aumentado para **{p['stats'][atributo]}**!\n⭐ Pontos restantes: {p['status_points']}", 0x00ff00))
+    await i.response.send_message(embed=make_embed("🎁 DAILY", f"Streak: **{streak} dias** 🔥\n💰 +{bonus_gold} Gold\n⭐ +{bonus_xp} XP\n\nVolte amanhã para manter sua streak!", 0x00ff00))
 
-@bot.tree.command(name="bau", description="🎁 Abrir um baú do tesouro")
-async def bau(i: discord.Interaction):
+# ============================================
+# COMANDO DE MONTARIAS
+# ============================================
+
+@bot.tree.command(name="montarias", description="🐉 Ver montarias disponíveis")
+async def montarias(i: discord.Interaction):
     p = bot.get_player(i.user.id)
     if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
     
-    if random.random() < 0.3:
-        p['chests_opened'] = p.get('chests_opened', 0) + 1
-        
-        roll = random.random()
-        if roll < 0.0007: egg = 'Ovo Supremo'
-        elif roll < 0.0037: egg = 'Ovo Mítico'
-        elif roll < 0.0137: egg = 'Ovo Lendário'
-        elif roll < 0.0437: egg = 'Ovo Épico'
-        elif roll < 0.1237: egg = 'Ovo Raro'
-        else: egg = 'Ovo Comum'
-        
-        p.setdefault('pet_eggs', []).append(egg)
-        gold = random.randint(50, 500)
-        p['gold'] += gold
-        bot.save_data()
-        await i.response.send_message(embed=make_embed("🎁 BAÚ ENCONTRADO!", f"Você encontrou um baú!\n\n🥚 **{egg}**\n💰 **{gold} Gold**\n\nUse `/chocar` para chocar o ovo!", 0xffd700))
-    else:
-        await i.response.send_message(embed=make_embed("🔍 NADA...", "Você procurou mas não encontrou nenhum baú. Tente novamente!", 0xff0000))
+    desc = "**Suas montarias:**\n" + ("\n".join([f"• {m}" for m in p.get('mounts', [])]) or "Nenhuma") + "\n\n**Loja de Montarias:**\n"
+    for name, data in MOUNTS.items():
+        owned = "✅" if name in p.get('mounts', []) else f"💰 {data['price']} Gold"
+        desc += f"{owned} **{name}** - {data['desc']}\n"
+    
+    await i.response.send_message(embed=make_embed("🐉 MONTARIAS", desc, 0xff00ff))
 
-# ============================================
-# EVENTOS
-# ============================================
-
-@bot.event
-async def on_ready():
-    print(f"""
-╔══════════════════════════════════════╗
-║   ⚔️ EIDOLON GAMES - RPG ⚔️       ║
-║   1800+ LINES OF ADVENTURE         ║
-║   👑 Dono ID: {bot.DONO_ID}              ║
-╚══════════════════════════════════════╝
-    """)
-    print(f"⚔️ Bot: {bot.user}")
-    print(f"🎮 /criar - Comece sua aventura!")
-    print(f"🛡️ /admin - Painel de Admin (só dono)")
-    print(f"⚒️ /craft - Craftar itens")
-    print(f"🐾 /pets - Seus pets")
-    print(f"🤝 /trade - Trocar itens")
-    print(f"⚔️ /pvp - Duelar jogadores")
-    print(f"📜 /pergaminhos - Usar pergaminhos")
-    print(f"🗺️ /ilhas - Ver ilhas disponíveis")
-    await bot.change_presence(activity=discord.Game(name="⚔️ /criar | EIDOLON RPG"))
+@bot.tree.command(name="comprar_montaria", description="🐉 Comprar uma montaria")
+@app_commands.describe(nome="Nome da montaria")
+async def comprar_montaria(i: discord.Interaction, nome: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    mount = MOUNTS.get(nome)
+    if not mount: return await i.response.send_message("❌ Montaria não encontrada!", ephemeral=True)
+    if nome in p.get('mounts', []): return await i.response.send_message("❌ Você já tem essa montaria!", ephemeral=True)
+    if p['gold'] < mount['price']: return await i.response.send_message(f"❌ {mount['price']} Gold necessário!", ephemeral=True)
+    
+    p['gold'] -= mount['price']
+    p.setdefault('mounts', []).append(nome)
+    if not p.get('mount'): p['mount'] = nome
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🐉 MONTARIA COMPRADA!", f"Você adquiriu **{nome}**!\n📝 {mount['desc']}", 0x00ff00))
 
 # ============================================
 # 70 QUESTS COMPLETAS
@@ -306,21 +250,21 @@ QUESTS = [
     {'name': 'Proteja a Vila', 'level': 2, 'xp': 80, 'gold': 100, 'gems': 8, 'desc': 'Derrote os bandidos'},
     {'name': 'Caça aos Goblins', 'level': 2, 'xp': 60, 'gold': 80, 'gems': 5, 'desc': 'Derrote 5 goblins'},
     {'name': 'Ervas Raras', 'level': 2, 'xp': 70, 'gold': 70, 'gems': 6, 'desc': 'Colete 3 ervas raras'},
-    {'name': 'O Poço Misterioso', 'level': 2, 'xp': 75, 'gold': 90, 'gems': 7, 'desc': 'Investigue o poço'},
+    {'name': 'O Poço Misterioso', 'level': 2, 'xp': 75, 'gold': 90, 'gems': 7, 'desc': 'Investigue o poço abandonado'},
     {'name': 'Pescaria', 'level': 2, 'xp': 50, 'gold': 60, 'gems': 4, 'desc': 'Pesque 5 peixes no rio'},
     {'name': 'Mina Abandonada', 'level': 3, 'xp': 120, 'gold': 150, 'gems': 10, 'desc': 'Explore a mina'},
     {'name': 'O Ladrão de Joias', 'level': 3, 'xp': 100, 'gold': 200, 'gems': 12, 'desc': 'Capture o ladrão'},
     {'name': 'O Tesouro do Pirata', 'level': 3, 'xp': 110, 'gold': 350, 'gems': 11, 'desc': 'Encontre o tesouro'},
     {'name': 'A Ponte Quebrada', 'level': 3, 'xp': 90, 'gold': 120, 'gems': 9, 'desc': 'Conserte a ponte'},
     {'name': 'Lobos Selvagens', 'level': 3, 'xp': 105, 'gold': 130, 'gems': 10, 'desc': 'Derrote 5 lobos'},
-    {'name': 'Caça ao Tesouro', 'level': 4, 'xp': 150, 'gold': 300, 'gems': 15, 'desc': 'Encontre o tesouro'},
+    {'name': 'Caça ao Tesouro', 'level': 4, 'xp': 150, 'gold': 300, 'gems': 15, 'desc': 'Encontre o tesouro escondido'},
     {'name': 'O Roubo do Banco', 'level': 4, 'xp': 130, 'gold': 280, 'gems': 14, 'desc': 'Impeça o roubo'},
     {'name': 'A Casa Mal-Assombrada', 'level': 4, 'xp': 140, 'gold': 200, 'gems': 13, 'desc': 'Investigue a casa'},
     {'name': 'O Poço dos Desejos', 'level': 4, 'xp': 120, 'gold': 180, 'gems': 12, 'desc': 'Faça um desejo'},
     {'name': 'Ovelhas Perdidas', 'level': 4, 'xp': 110, 'gold': 160, 'gems': 11, 'desc': 'Encontre 5 ovelhas'},
     {'name': 'A Floresta Sombria', 'level': 5, 'xp': 200, 'gold': 250, 'gems': 15, 'desc': 'Sobreviva à floresta'},
     {'name': 'A Floresta Encantada', 'level': 5, 'xp': 180, 'gold': 220, 'gems': 12, 'desc': 'Colete flores mágicas'},
-    {'name': 'A Poção Mágica', 'level': 5, 'xp': 190, 'gold': 240, 'gems': 13, 'desc': 'Crie a poção mágica'},
+    {'name': 'A Poção Mágica', 'level': 5, 'xp': 190, 'gold': 240, 'gems': 13, 'desc': 'Crie a poção'},
     {'name': 'O Feiticeiro Louco', 'level': 5, 'xp': 210, 'gold': 260, 'gems': 16, 'desc': 'Derrote o feiticeiro'},
     {'name': 'Cogumelos Mágicos', 'level': 5, 'xp': 170, 'gold': 210, 'gems': 11, 'desc': 'Colete cogumelos'},
     {'name': 'O Enigma da Esfinge', 'level': 6, 'xp': 250, 'gold': 350, 'gems': 20, 'desc': 'Resolva o enigma'},
@@ -374,7 +318,7 @@ QUESTS = [
 ]
 
 # ============================================
-# 25 BOSSES COMPLETOS
+# BOSSES (CADA UM NA SUA ILHA)
 # ============================================
 
 BOSSES = [
@@ -406,167 +350,44 @@ BOSSES = [
 ]
 
 # ============================================
-# 100 RECEITAS DE CRAFT
+# ILHAS COM BOSSES EXCLUSIVOS
 # ============================================
 
-ITEMS_CRAFT = {
-    # ARMAS (25)
-    'Espada de Ferro': {'materials': {'Ferro': 5}, 'level': 1, 'stats': {'forca': 3}, 'desc': 'Uma espada básica de ferro'},
-    'Espada de Prata': {'materials': {'Ferro': 10, 'Prata': 5}, 'level': 5, 'stats': {'forca': 5}, 'desc': 'Espada de prata refinada'},
-    'Espada de Ouro': {'materials': {'Ouro': 10, 'Ferro': 20}, 'level': 10, 'stats': {'forca': 10}, 'desc': 'Espada banhada a ouro'},
-    'Lâmina do Dragão': {'materials': {'Escama de Dragão': 5, 'Mithril': 10}, 'level': 15, 'stats': {'forca': 20, 'agilidade': 5}, 'desc': 'Forjada com escamas de dragão'},
-    'Martelo de Guerra': {'materials': {'Ferro': 30, 'Ouro': 15}, 'level': 12, 'stats': {'forca': 15}, 'desc': 'Martelo pesado de guerra'},
-    'Arco Élfico': {'materials': {'Madeira Sagrada': 10, 'Prata': 5}, 'level': 8, 'stats': {'forca': 8, 'agilidade': 5}, 'desc': 'Arco élfico preciso'},
-    'Cajado Arcano': {'materials': {'Cristal Mágico': 10, 'Ouro': 15}, 'level': 14, 'stats': {'magia': 15, 'mana': 10}, 'desc': 'Cajado imbuído com magia'},
-    'Manopla do Poder': {'materials': {'Adamantita': 8, 'Ouro': 20}, 'level': 16, 'stats': {'forca': 25}, 'desc': 'Manopla que aumenta a força'},
-    'Lâmina do Caos': {'materials': {'Pedra Infernal': 10, 'Fragmento Celestial': 5, 'Escama de Dragão': 10}, 'level': 20, 'stats': {'forca': 50, 'agilidade': 20}, 'desc': 'A arma mais poderosa'},
-    'Adaga Sombria': {'materials': {'Essência Sombria': 5, 'Mithril': 5}, 'level': 9, 'stats': {'forca': 7, 'agilidade': 8}, 'desc': 'Adaga das sombras'},
-    
-    # ARMADURAS (25)
-    'Armadura de Couro': {'materials': {'Couro': 10}, 'level': 2, 'stats': {'defesa': 3}, 'desc': 'Armadura leve de couro'},
-    'Armadura de Ferro': {'materials': {'Ferro': 15}, 'level': 5, 'stats': {'defesa': 8}, 'desc': 'Armadura de ferro'},
-    'Armadura de Prata': {'materials': {'Prata': 15, 'Ferro': 10}, 'level': 8, 'stats': {'defesa': 12}, 'desc': 'Armadura de prata'},
-    'Armadura de Ouro': {'materials': {'Ouro': 20, 'Ferro': 15}, 'level': 12, 'stats': {'defesa': 20}, 'desc': 'Armadura de ouro'},
-    'Armadura de Mithril': {'materials': {'Mithril': 15}, 'level': 14, 'stats': {'defesa': 25}, 'desc': 'Armadura leve e resistente'},
-    'Armadura Divina': {'materials': {'Fragmento Celestial': 10, 'Adamantita': 15}, 'level': 18, 'stats': {'defesa': 40, 'vida': 30}, 'desc': 'Abençoada pelos deuses'},
-    'Escudo de Madeira': {'materials': {'Madeira Sagrada': 8}, 'level': 3, 'stats': {'defesa': 4}, 'desc': 'Escudo simples'},
-    'Escudo de Ferro': {'materials': {'Ferro': 12}, 'level': 6, 'stats': {'defesa': 10}, 'desc': 'Escudo de ferro'},
-    'Escudo de Mithril': {'materials': {'Mithril': 10}, 'level': 13, 'stats': {'defesa': 22}, 'desc': 'Escudo leve'},
-    'Escudo Divino': {'materials': {'Fragmento Celestial': 8, 'Ouro': 15}, 'level': 17, 'stats': {'defesa': 35}, 'desc': 'Escudo celestial'},
-    
-    # ACESSÓRIOS (25)
-    'Anel de Sorte': {'materials': {'Ouro': 5, 'Cristal Mágico': 3}, 'level': 5, 'stats': {'sorte': 10}, 'desc': '+10 Sorte'},
-    'Colar da Sabedoria': {'materials': {'Prata': 8, 'Cristal Mágico': 5}, 'level': 8, 'stats': {'magia': 8, 'mana': 8}, 'desc': '+8 Magia e Mana'},
-    'Botas Velozes': {'materials': {'Couro': 10, 'Prata': 5}, 'level': 6, 'stats': {'agilidade': 10}, 'desc': '+10 Agilidade'},
-    'Amuleto da Sorte': {'materials': {'Ouro': 15, 'Cristal Mágico': 8}, 'level': 12, 'stats': {'sorte': 20}, 'desc': '+20 Sorte'},
-    'Bracelete de Força': {'materials': {'Ferro': 15, 'Ouro': 10}, 'level': 10, 'stats': {'forca': 10}, 'desc': '+10 Força'},
-    'Cinto do Guerreiro': {'materials': {'Couro': 20, 'Ferro': 15}, 'level': 9, 'stats': {'forca': 8, 'defesa': 5}, 'desc': '+8 Força +5 Defesa'},
-    'Tiara Mágica': {'materials': {'Prata': 10, 'Cristal Mágico': 10}, 'level': 11, 'stats': {'magia': 12, 'mana': 10}, 'desc': '+12 Magia +10 Mana'},
-    'Pedra da Vitalidade': {'materials': {'Cristal Mágico': 15, 'Ouro': 10}, 'level': 14, 'stats': {'vida': 30}, 'desc': '+30 Vida'},
-    'Olho do Dragão': {'materials': {'Escama de Dragão': 3, 'Ouro': 20}, 'level': 16, 'stats': {'forca': 15, 'sorte': 10}, 'desc': '+15 Força +10 Sorte'},
-    'Coração de Fênix': {'materials': {'Essência de Fênix': 5, 'Ouro': 25}, 'level': 18, 'stats': {'vida': 50, 'sorte': 15}, 'desc': '+50 Vida +15 Sorte'},
-    
-    # POÇÕES (15)
-    'Poção de Cura': {'materials': {'Erva Medicinal': 3}, 'level': 1, 'stats': {}, 'desc': 'Restaura 50 HP'},
-    'Poção de Cura Grande': {'materials': {'Erva Medicinal': 5, 'Cristal Mágico': 2}, 'level': 5, 'stats': {}, 'desc': 'Restaura 150 HP'},
-    'Poção de Mana': {'materials': {'Cristal Mágico': 3}, 'level': 1, 'stats': {}, 'desc': 'Restaura 30 MP'},
-    'Poção de Mana Grande': {'materials': {'Cristal Mágico': 5, 'Erva Medicinal': 3}, 'level': 5, 'stats': {}, 'desc': 'Restaura 100 MP'},
-    'Elixir': {'materials': {'Erva Medicinal': 10, 'Cristal Mágico': 10}, 'level': 10, 'stats': {}, 'desc': 'Restaura todo HP e MP'},
-    'Poção de Força': {'materials': {'Ferro': 5, 'Erva Medicinal': 3}, 'level': 3, 'stats': {}, 'desc': '+10 Força por 1 batalha'},
-    'Poção de Defesa': {'materials': {'Pedra': 5, 'Erva Medicinal': 3}, 'level': 3, 'stats': {}, 'desc': '+10 Defesa por 1 batalha'},
-    'Poção de Velocidade': {'materials': {'Pena': 5, 'Erva Medicinal': 3}, 'level': 3, 'stats': {}, 'desc': '+10 Agilidade por 1 batalha'},
-    'Poção de Sorte': {'materials': {'Trevo': 5, 'Cristal Mágico': 3}, 'level': 5, 'stats': {}, 'desc': '+15 Sorte por 3 batalhas'},
-    'Poção Suprema': {'materials': {'Erva Medicinal': 15, 'Cristal Mágico': 10, 'Ouro': 5}, 'level': 15, 'stats': {}, 'desc': '+50 todos os status'},
-    
-    # FERRAMENTAS (10)
-    'Picareta de Ferro': {'materials': {'Ferro': 10, 'Madeira': 5}, 'level': 1, 'stats': {}, 'desc': 'Minera melhor (+1 minério)'},
-    'Picareta de Prata': {'materials': {'Prata': 10, 'Ferro': 15}, 'level': 5, 'stats': {}, 'desc': 'Minera melhor (+2 minérios)'},
-    'Picareta de Ouro': {'materials': {'Ouro': 10, 'Ferro': 20}, 'level': 10, 'stats': {}, 'desc': 'Minera melhor (+3 minérios)'},
-    'Picareta de Mithril': {'materials': {'Mithril': 10, 'Ouro': 15}, 'level': 15, 'stats': {}, 'desc': 'Minera melhor (+5 minérios)'},
-    'Vara de Pescar': {'materials': {'Madeira': 10, 'Linha': 5}, 'level': 1, 'stats': {}, 'desc': 'Pesca melhor'},
-    'Vara de Pescar Pro': {'materials': {'Madeira Sagrada': 10, 'Linha de Prata': 5}, 'level': 8, 'stats': {}, 'desc': 'Pesca muito melhor'},
-    'Tocha': {'materials': {'Madeira': 5, 'Carvão': 3}, 'level': 1, 'stats': {}, 'desc': 'Explora melhor'},
-    'Tocha Mágica': {'materials': {'Madeira Sagrada': 5, 'Cristal Mágico': 3}, 'level': 5, 'stats': {}, 'desc': 'Explora muito melhor'},
-    'Mapa do Tesouro': {'materials': {'Papel': 5, 'Tinta': 3}, 'level': 3, 'stats': {}, 'desc': 'Encontra mais tesouros'},
-    'Bússola Mágica': {'materials': {'Cristal Mágico': 5, 'Ouro': 5}, 'level': 7, 'stats': {}, 'desc': 'Sempre aponta para tesouros'},
-}
+ISLANDS = [
+    {'name': 'Ilha Inicial', 'cost': 0, 'level': 1, 'ores': ['Ferro', 'Pedra', 'Cobre'], 'bosses': ['Slime Rei', 'Goblin Chefe', 'Lobo Alfa'], 'desc': 'Onde tudo começa'},
+    {'name': 'Ilha da Floresta', 'cost': 500, 'level': 5, 'ores': ['Madeira Sagrada', 'Seiva Mística'], 'bosses': ['Aranha Gigante'], 'desc': 'Floresta densa e misteriosa'},
+    {'name': 'Ilha do Gelo', 'cost': 2000, 'level': 10, 'ores': ['Prata', 'Gelo Eterno'], 'bosses': ['Rei Gelado', 'Dragão de Gelo'], 'desc': 'Fria e perigosa'},
+    {'name': 'Ilha do Vulcão', 'cost': 5000, 'level': 15, 'ores': ['Ouro', 'Obsidiana'], 'bosses': ['Dragão de Fogo', 'Fênix Flamejante', 'Fênix Negra'], 'desc': 'Quente e mortal'},
+    {'name': 'Ilha Sombria', 'cost': 8000, 'level': 20, 'ores': ['Mithril', 'Essência Sombria'], 'bosses': ['Lorde das Sombras', 'Rei dos Mortos'], 'desc': 'Coberta de trevas'},
+    {'name': 'Ilha das Montanhas', 'cost': 12000, 'level': 25, 'ores': ['Adamantita', 'Pedra Rúnica'], 'bosses': ['Golem de Pedra', 'Titã de Ferro'], 'desc': 'Montanhas gigantes'},
+    {'name': 'Ilha do Oceano', 'cost': 20000, 'level': 30, 'ores': ['Pérola Negra', 'Coral Mágico'], 'bosses': ['Serpente Marinha', 'Leviatã'], 'desc': 'Profundezas misteriosas'},
+    {'name': 'Ilha dos Dragões', 'cost': 50000, 'level': 50, 'ores': ['Escama de Dragão', 'Cristal Dracônico'], 'bosses': ['Dragão Ancião', 'Dragão Supremo'], 'desc': 'Lar dos dragões'},
+    {'name': 'Ilha Celestial', 'cost': 100000, 'level': 100, 'ores': ['Fragmento Celestial', 'Nuvem Sólida'], 'bosses': ['Deus do Trovão', 'Titã do Trovão', 'Deus Primordial'], 'desc': 'Acima das nuvens'},
+    {'name': 'Ilha do Inferno', 'cost': 500000, 'level': 200, 'ores': ['Pedra Infernal', 'Lava Solidificada'], 'bosses': ['Rei Demônio', 'Deus do Caos', 'O Criador'], 'desc': 'O lugar mais perigoso'},
+    {'name': 'Ilha do Templo', 'cost': 3000, 'level': 12, 'ores': ['Ouro', 'Relíquia Sagrada'], 'bosses': ['Guardião do Templo'], 'desc': 'Ruínas antigas'},
+    {'name': 'Ilha Mágica', 'cost': 1500, 'level': 8, 'ores': ['Cristal Mágico', 'Pó de Fada'], 'bosses': ['Mago Supremo'], 'desc': 'Onde a magia flui'},
+    {'name': 'Ilha do Deserto', 'cost': 1000, 'level': 7, 'ores': ['Ouro', 'Arenito', 'Marfim'], 'bosses': [], 'desc': 'Deserto escaldante'},
+    {'name': 'Ilha do Céu', 'cost': 30000, 'level': 35, 'ores': ['Nuvem Sólida', 'Vento Etéreo'], 'bosses': [], 'desc': 'Entre as nuvens'},
+    {'name': 'Ilha do Submundo', 'cost': 200000, 'level': 150, 'ores': ['Pedra Infernal', 'Essência Demoníaca'], 'bosses': [], 'desc': 'Abaixo da superfície'},
+]
 
 # ============================================
-# MATERIAIS
+# COMANDO DE BOSS (SÓ NA ILHA CERTA)
 # ============================================
 
-MATERIAIS_CRAFT = {
-    'Ferro': {'rarity': 'Comum', 'found_in': ['Ilha Inicial', 'Ilha das Montanhas'], 'price': 10},
-    'Prata': {'rarity': 'Comum', 'found_in': ['Ilha do Gelo', 'Ilha Inicial'], 'price': 25},
-    'Ouro': {'rarity': 'Raro', 'found_in': ['Ilha do Vulcão', 'Ilha do Deserto'], 'price': 50},
-    'Mithril': {'rarity': 'Épico', 'found_in': ['Ilha Sombria', 'Ilha dos Dragões'], 'price': 100},
-    'Adamantita': {'rarity': 'Lendário', 'found_in': ['Ilha Celestial', 'Ilha do Inferno'], 'price': 200},
-    'Obsidiana': {'rarity': 'Raro', 'found_in': ['Ilha do Vulcão'], 'price': 40},
-    'Cristal Mágico': {'rarity': 'Raro', 'found_in': ['Ilha Mágica'], 'price': 60},
-    'Fragmento Celestial': {'rarity': 'Mítico', 'found_in': ['Ilha Celestial'], 'price': 500},
-    'Pedra Infernal': {'rarity': 'Supremo', 'found_in': ['Ilha do Inferno'], 'price': 1000},
-    'Pérola Negra': {'rarity': 'Lendário', 'found_in': ['Ilha do Oceano'], 'price': 300},
-    'Coral Mágico': {'rarity': 'Épico', 'found_in': ['Ilha do Oceano'], 'price': 150},
-    'Escama de Dragão': {'rarity': 'Lendário', 'found_in': ['Ilha dos Dragões'], 'price': 250},
-    'Essência Sombria': {'rarity': 'Épico', 'found_in': ['Ilha Sombria'], 'price': 120},
-    'Essência Demoníaca': {'rarity': 'Lendário', 'found_in': ['Ilha do Inferno'], 'price': 350},
-    'Gelo Eterno': {'rarity': 'Raro', 'found_in': ['Ilha do Gelo'], 'price': 70},
-    'Nuvem Sólida': {'rarity': 'Épico', 'found_in': ['Ilha do Céu'], 'price': 130},
-    'Erva Medicinal': {'rarity': 'Comum', 'found_in': ['Ilha Inicial', 'Ilha da Floresta'], 'price': 5},
-    'Cogumelo': {'rarity': 'Comum', 'found_in': ['Ilha da Floresta'], 'price': 3},
-    'Flor Mágica': {'rarity': 'Raro', 'found_in': ['Ilha Mágica'], 'price': 35},
-    'Trevo': {'rarity': 'Comum', 'found_in': ['Ilha Inicial'], 'price': 4},
-    'Pena': {'rarity': 'Comum', 'found_in': ['Ilha Inicial'], 'price': 2},
-    'Couro': {'rarity': 'Comum', 'found_in': ['Ilha Inicial'], 'price': 8},
-    'Linha': {'rarity': 'Comum', 'found_in': ['Ilha Inicial'], 'price': 3},
-    'Linha de Prata': {'rarity': 'Raro', 'found_in': ['Ilha Mágica'], 'price': 30},
-    'Madeira': {'rarity': 'Comum', 'found_in': ['Ilha Inicial', 'Ilha da Floresta'], 'price': 4},
-    'Madeira Sagrada': {'rarity': 'Raro', 'found_in': ['Ilha da Floresta'], 'price': 45},
-    'Carvão': {'rarity': 'Comum', 'found_in': ['Ilha Inicial'], 'price': 3},
-    'Papel': {'rarity': 'Comum', 'found_in': ['Ilha Inicial'], 'price': 5},
-    'Tinta': {'rarity': 'Comum', 'found_in': ['Ilha Inicial'], 'price': 6},
-    'Pedra': {'rarity': 'Comum', 'found_in': ['Ilha Inicial', 'Ilha das Montanhas'], 'price': 4},
-}
-
-# ============================================
-# COMANDOS DE MISSÃO E BOSS
-# ============================================
-
-@bot.tree.command(name="missoes", description="📋 Ver missões disponíveis")
-async def missoes(i: discord.Interaction):
-    p = bot.get_player(i.user.id)
-    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
-    available = [q for q in QUESTS if p['level'] >= q['level'] and q['name'] not in p.get('quests_completed', [])]
-    desc = "\n".join([f"**{q['name']}** (Nv.{q['level']})\n{q['desc']}\n💰 {q['gold']} Gold | 💎 {q['gems']} Gems | ⭐ {q['xp']} XP\n" for q in available[:10]])
-    await i.response.send_message(embed=make_embed("📋 MISSÕES", desc or "Nenhuma disponível", 0xffaa00))
-
-@bot.tree.command(name="missao", description="⚔️ Fazer uma missão")
-@app_commands.describe(nome="Nome da missão")
-async def missao(i: discord.Interaction, nome: str):
-    p = bot.get_player(i.user.id)
-    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
-    quest = next((q for q in QUESTS if q['name'].lower() == nome.lower()), None)
-    if not quest: return await i.response.send_message("❌ Missão não encontrada!", ephemeral=True)
-    if p['level'] < quest['level']: return await i.response.send_message(f"❌ Nível {quest['level']} necessário!", ephemeral=True)
-    if quest['name'] in p.get('quests_completed', []): return await i.response.send_message("❌ Missão já concluída!", ephemeral=True)
-    
-    chance = min(90, 50 + (p['level'] - quest['level']) * 10)
-    if random.randint(1, 100) <= chance:
-        p['xp'] += quest['xp']
-        p['gold'] += quest['gold']
-        p['gems'] += quest['gems']
-        p.setdefault('quests_completed', []).append(quest['name'])
-        
-        while p['xp'] >= p['xp_needed']:
-            p['level'] += 1
-            p['xp'] -= p['xp_needed']
-            p['xp_needed'] = int(p['xp_needed'] * 1.5)
-            p['max_hp'] += 20; p['hp'] = p['max_hp']
-            p['max_mp'] += 10; p['mp'] = p['max_mp']
-            p['atk'] += 3; p['def'] += 2; p['spd'] += 1
-            p['status_points'] = p.get('status_points', 0) + 2
-        
-        bot.save_data()
-        await i.response.send_message(embed=make_embed("✅ MISSÃO COMPLETA!", f"**{quest['name']}** concluída!\n💰 +{quest['gold']} Gold | 💎 +{quest['gems']} Gems | ⭐ +{quest['xp']} XP", 0x00ff00))
-    else:
-        p['hp'] = max(1, p['hp'] - 20)
-        bot.save_data()
-        await i.response.send_message(embed=make_embed("❌ MISSÃO FALHOU!", "Você falhou e perdeu 20 HP!", 0xff0000))
-
-@bot.tree.command(name="bosses", description="👹 Ver bosses disponíveis")
-async def bosses(i: discord.Interaction):
-    p = bot.get_player(i.user.id)
-    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
-    desc = "\n".join([f"**{b['name']}** (Nv.{b['level']})\n❤️ {b['hp']} HP | ⚔️ {b['atk']} ATK | 🛡️ {b['def']} DEF\n📍 {b['island']} | 💰 {b['gold']} Gold\n" for b in BOSSES[:10]])
-    await i.response.send_message(embed=make_embed("👹 BOSSES", desc or "Nenhum disponível", 0xff0000))
-
-@bot.tree.command(name="boss", description="⚔️ Enfrentar um Boss")
+@bot.tree.command(name="boss", description="⚔️ Enfrentar um Boss (precisa estar na ilha certa)")
 @app_commands.describe(nome="Nome do Boss")
 async def boss(i: discord.Interaction, nome: str):
     p = bot.get_player(i.user.id)
     if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
     boss_data = next((b for b in BOSSES if b['name'].lower() == nome.lower()), None)
     if not boss_data: return await i.response.send_message("❌ Boss não encontrado!", ephemeral=True)
+    
+    current_island = p.get('island', 'Ilha Inicial')
+    if boss_data['island'] != current_island:
+        return await i.response.send_message(f"❌ Você precisa estar na **{boss_data['island']}** para enfrentar este boss!\nUse `/viajar {boss_data['island']}` primeiro.", ephemeral=True)
+    
     if p['level'] < boss_data['level']: return await i.response.send_message(f"❌ Nível {boss_data['level']} necessário!", ephemeral=True)
     
     boss_hp = boss_data['hp']
@@ -601,6 +422,13 @@ async def boss(i: discord.Interaction, nome: str):
             p.setdefault('pet_eggs', []).append(egg)
             log.append(f"🥚 Drop: **{egg}**!")
         
+        # Verifica títulos
+        for title_name, title_data in TITLES.items():
+            if title_name not in p.get('titles', []):
+                if 'Dragão' in boss_data['name'] and 'Dragon' in title_name:
+                    p.setdefault('titles', []).append(title_name)
+                    log.append(f"🏅 Novo título: **{title_name}**!")
+        
         bot.save_data()
         result = f"✅ **VITÓRIA!**\n💰 +{boss_data['gold']} Gold | 💎 +{boss_data['gems']} Gems | ⭐ +{boss_data['xp']} XP"
     else:
@@ -608,11 +436,645 @@ async def boss(i: discord.Interaction, nome: str):
         bot.save_data()
         result = "❌ **DERROTA!** Perdeu metade do HP!"
     
-    await i.response.send_message(embed=make_embed(f"⚔️ VS {boss_data['name']}", "\n".join(log[-10:]) + f"\n\n{result}", 0x00ff00 if player_hp > 0 else 0xff0000))
+    await i.response.send_message(embed=make_embed(f"⚔️ VS {boss_data['name']} ({current_island})", "\n".join(log[-10:]) + f"\n\n{result}", 0x00ff00 if player_hp > 0 else 0xff0000))
+
+@bot.tree.command(name="bosses", description="👹 Ver bosses disponíveis na sua ilha atual")
+async def bosses(i: discord.Interaction):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    current = p.get('island', 'Ilha Inicial')
+    desc = f"**📍 Você está em: {current}**\n\n"
+    
+    for b in BOSSES:
+        if b['island'] == current:
+            available = "✅" if p['level'] >= b['level'] else "🔒"
+            desc += f"{available} **{b['name']}** (Nv.{b['level']})\n❤️ {b['hp']} HP | ⚔️ {b['atk']} ATK | 💰 {b['gold']} Gold\n\n"
+    
+    await i.response.send_message(embed=make_embed(f"👹 BOSSES EM {current.upper()}", desc or "Nenhum boss nesta ilha", 0xff0000))
+
+@bot.tree.command(name="missoes", description="📋 Ver missões disponíveis")
+async def missoes(i: discord.Interaction):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    available = [q for q in QUESTS if p['level'] >= q['level'] and q['name'] not in p.get('quests_completed', [])]
+    desc = "\n".join([f"**{q['name']}** (Nv.{q['level']})\n{q['desc']}\n💰 {q['gold']} Gold | ⭐ {q['xp']} XP\n" for q in available[:10]])
+    await i.response.send_message(embed=make_embed("📋 MISSÕES", desc or "Nenhuma disponível", 0xffaa00))
+
+@bot.tree.command(name="missao", description="⚔️ Fazer uma missão")
+@app_commands.describe(nome="Nome da missão")
+async def missao(i: discord.Interaction, nome: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    quest = next((q for q in QUESTS if q['name'].lower() == nome.lower()), None)
+    if not quest: return await i.response.send_message("❌ Missão não encontrada!", ephemeral=True)
+    if p['level'] < quest['level']: return await i.response.send_message(f"❌ Nível {quest['level']} necessário!", ephemeral=True)
+    if quest['name'] in p.get('quests_completed', []): return await i.response.send_message("❌ Missão já concluída!", ephemeral=True)
+    
+    chance = min(90, 50 + (p['level'] - quest['level']) * 10)
+    if random.randint(1, 100) <= chance:
+        p['xp'] += quest['xp']
+        p['gold'] += quest['gold']
+        p['gems'] += quest['gems']
+        p.setdefault('quests_completed', []).append(quest['name'])
+        
+        while p['xp'] >= p['xp_needed']:
+            p['level'] += 1
+            p['xp'] -= p['xp_needed']
+            p['xp_needed'] = int(p['xp_needed'] * 1.5)
+            p['max_hp'] += 20; p['hp'] = p['max_hp']
+            p['max_mp'] += 10; p['mp'] = p['max_mp']
+            p['atk'] += 3; p['def'] += 2; p['spd'] += 1
+            p['status_points'] = p.get('status_points', 0) + 2
+        
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("✅ MISSÃO COMPLETA!", f"**{quest['name']}** concluída!\n💰 +{quest['gold']} Gold | ⭐ +{quest['xp']} XP", 0x00ff00))
+    else:
+        p['hp'] = max(1, p['hp'] - 20)
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("❌ MISSÃO FALHOU!", "Você falhou e perdeu 20 HP!", 0xff0000))
+
+@bot.tree.command(name="ilhas", description="🗺️ Ver todas as ilhas")
+async def ilhas(i: discord.Interaction):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    desc = ""
+    for ilha in ISLANDS:
+        available = "✅" if p['level'] >= ilha['level'] and p['gold'] >= ilha['cost'] else "🔒"
+        desc += f"{available} **{ilha['name']}** (Nv.{ilha['level']})\n💰 {ilha['cost']} Gold\n👹 Bosses: {', '.join(ilha['bosses']) or 'Nenhum'}\n⛏️ Minérios: {', '.join(ilha['ores'][:2])}\n\n"
+    
+    await i.response.send_message(embed=make_embed("🗺️ ILHAS", desc, 0x00ff00))
+
+@bot.tree.command(name="viajar", description="🗺️ Viajar para uma ilha")
+@app_commands.describe(nome="Nome da ilha")
+async def viajar(i: discord.Interaction, nome: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    ilha = next((il for il in ISLANDS if il['name'].lower() == nome.lower()), None)
+    if not ilha: return await i.response.send_message("❌ Ilha não encontrada!", ephemeral=True)
+    if p['level'] < ilha['level']: return await i.response.send_message(f"❌ Nível {ilha['level']} necessário!", ephemeral=True)
+    if p['gold'] < ilha['cost']: return await i.response.send_message(f"❌ {ilha['cost']} Gold necessário!", ephemeral=True)
+    
+    p['gold'] -= ilha['cost']
+    p['island'] = ilha['name']
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🗺️ VIAGEM", f"Você viajou para **{ilha['name']}**!\n💰 Custo: {ilha['cost']} Gold\n👹 Bosses: {', '.join(ilha['bosses']) or 'Nenhum'}\n⛏️ Minérios: {', '.join(ilha['ores'])}", 0x00ff00))
+
+@bot.tree.command(name="minerar", description="⛏️ Minerar na ilha atual")
+async def minerar(i: discord.Interaction):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    ilha = next((il for il in ISLANDS if il['name'] == p.get('island', 'Ilha Inicial')), None)
+    if not ilha: return await i.response.send_message("❌ Ilha não encontrada!", ephemeral=True)
+    
+    ore = random.choice(ilha['ores'])
+    amount = random.randint(1, 5)
+    p.setdefault('materials', {})
+    p['materials'][ore] = p['materials'].get(ore, 0) + amount
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("⛏️ MINERAR", f"Você minerou **{amount}x {ore}** na **{ilha['name']}**!", 0xffaa00))
 
 # ============================================
-# COMANDOS DE CRAFT
+# SISTEMA DE PETS
 # ============================================
+
+OVOS = {
+    'Ovo Comum': {'rarity': 'Comum', 'chance': 0.15, 'pets': ['Slime', 'Rato', 'Pássaro', 'Gato', 'Cachorro']},
+    'Ovo Raro': {'rarity': 'Raro', 'chance': 0.08, 'pets': ['Lobo', 'Águia', 'Cobra', 'Raposa', 'Coruja']},
+    'Ovo Épico': {'rarity': 'Épico', 'chance': 0.03, 'pets': ['Tigre', 'Urso', 'Pantera', 'Grifo', 'Hipogrifo']},
+    'Ovo Lendário': {'rarity': 'Lendário', 'chance': 0.01, 'pets': ['Dragão Jovem', 'Fênix', 'Quimera', 'Serpente Alada', 'Unicórnio']},
+    'Ovo Mítico': {'rarity': 'Mítico', 'chance': 0.003, 'pets': ['Dragão Ancião', 'Leviatã', 'Titã', 'Deus Menor', 'Entidade Cósmica']},
+    'Ovo Supremo': {'rarity': 'Supremo', 'chance': 0.0007, 'pets': ['Dragão Supremo', 'Deus do Caos', 'Fênix Primordial', 'Ser Supremo', 'O Criador']},
+}
+
+@bot.tree.command(name="pets", description="🐾 Ver seus pets")
+async def pets(i: discord.Interaction):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    pets_list = p.get('pets', [])
+    eggs = p.get('pet_eggs', [])
+    active = p.get('active_pet', 'Nenhum')
+    
+    desc = f"🐾 **Pet Ativo:** {active}\n\n"
+    desc += "**Pets:**\n" + ("\n".join([f"• {pet}" for pet in pets_list]) or "Nenhum") + "\n\n"
+    desc += "**Ovos:**\n" + ("\n".join([f"• {egg}" for egg in eggs]) or "Nenhum")
+    
+    await i.response.send_message(embed=make_embed("🐾 PETS", desc, 0xff00ff))
+
+@bot.tree.command(name="chocar", description="🥚 Chocar um ovo de pet")
+async def chocar(i: discord.Interaction):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    eggs = p.get('pet_eggs', [])
+    if not eggs: return await i.response.send_message("❌ Você não tem ovos!", ephemeral=True)
+    
+    egg_priority = ['Ovo Supremo', 'Ovo Mítico', 'Ovo Lendário', 'Ovo Épico', 'Ovo Raro', 'Ovo Comum']
+    chosen_egg = None
+    for priority in egg_priority:
+        if priority in eggs:
+            chosen_egg = priority
+            break
+    
+    if not chosen_egg: return await i.response.send_message("❌ Erro ao chocar ovo!", ephemeral=True)
+    
+    egg_data = OVOS[chosen_egg]
+    if random.random() < egg_data['chance']:
+        pet = random.choice(egg_data['pets'])
+        p['pet_eggs'].remove(chosen_egg)
+        p.setdefault('pets', []).append(pet)
+        if not p.get('active_pet'): p['active_pet'] = pet
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("🥚 OVO CHOCOU!", f"🎉 Você conseguiu um **{pet}** ({egg_data['rarity']})!", 0x00ff00))
+    else:
+        p['pet_eggs'].remove(chosen_egg)
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("💔 OVO QUEBROU!", f"Infelizmente o {chosen_egg} não vingou...", 0xff0000))
+
+# ============================================
+# 🏪 SISTEMA DE LEILÃO
+# ============================================
+
+@bot.tree.command(name="leilao_criar", description="🏪 Criar um leilão de item")
+@app_commands.describe(item="Item para leiloar", preco_minimo="Preço mínimo em Gold", duracao="Duração em horas")
+async def leilao_criar(i: discord.Interaction, item: str, preco_minimo: int, duracao: int = 24):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    if item not in p.get('inventory', []): return await i.response.send_message("❌ Você não tem esse item!", ephemeral=True)
+    if preco_minimo <= 0: return await i.response.send_message("❌ Preço inválido!", ephemeral=True)
+    
+    auction_id = hashlib.md5(f"{i.user.id}{datetime.datetime.now()}".encode()).hexdigest()[:8]
+    bot.auctions[auction_id] = {
+        'seller': i.user.id,
+        'item': item,
+        'min_price': preco_minimo,
+        'current_bid': 0,
+        'highest_bidder': None,
+        'end_time': datetime.datetime.now() + datetime.timedelta(hours=duracao),
+        'active': True
+    }
+    
+    p['inventory'].remove(item)
+    bot.save_data()
+    
+    await i.response.send_message(embed=make_embed("🏪 LEILÃO CRIADO!", f"**{item}**\n💰 Preço mínimo: {preco_minimo:,} Gold\n⏰ Duração: {duracao}h\n🆔 ID: `{auction_id}`\n\nUse `/leilao_ver {auction_id}` para dar lances!", 0xffd700))
+
+@bot.tree.command(name="leilao_ver", description="🏪 Ver leilões ativos")
+async def leilao_ver(i: discord.Interaction):
+    active = {k: v for k, v in bot.auctions.items() if v['active']}
+    if not active:
+        return await i.response.send_message("❌ Nenhum leilão ativo no momento!", ephemeral=True)
+    
+    desc = ""
+    for aid, data in list(active.items())[:10]:
+        seller = await bot.fetch_user(data['seller'])
+        time_left = data['end_time'] - datetime.datetime.now()
+        hours_left = max(0, time_left.total_seconds() // 3600)
+        desc += f"🆔 `{aid}` | 🏷️ **{data['item']}**\n👤 {seller.name}\n💰 Lance atual: {data['current_bid']:,} Gold\n⏰ {int(hours_left)}h restantes\n\n"
+    
+    await i.response.send_message(embed=make_embed("🏪 LEILÕES ATIVOS", desc, 0xffd700))
+
+@bot.tree.command(name="leilao_lance", description="💰 Dar lance em um leilão")
+@app_commands.describe(auction_id="ID do leilão", valor="Valor do lance")
+async def leilao_lance(i: discord.Interaction, auction_id: str, valor: int):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    auction = bot.auctions.get(auction_id)
+    if not auction or not auction['active']: return await i.response.send_message("❌ Leilão não encontrado!", ephemeral=True)
+    if datetime.datetime.now() > auction['end_time']:
+        auction['active'] = False
+        return await i.response.send_message("❌ Leilão encerrado!", ephemeral=True)
+    if valor <= auction['current_bid']: return await i.response.send_message(f"❌ Lance mínimo: {auction['current_bid']+1:,} Gold!", ephemeral=True)
+    if valor < auction['min_price']: return await i.response.send_message(f"❌ Preço mínimo: {auction['min_price']:,} Gold!", ephemeral=True)
+    if p['gold'] < valor: return await i.response.send_message("❌ Gold insuficiente!", ephemeral=True)
+    
+    # Devolve gold do antigo maior lance
+    if auction['highest_bidder']:
+        old_bidder = bot.get_player(auction['highest_bidder'])
+        if old_bidder:
+            old_bidder['gold'] += auction['current_bid']
+    
+    p['gold'] -= valor
+    auction['current_bid'] = valor
+    auction['highest_bidder'] = i.user.id
+    bot.save_data()
+    
+    await i.response.send_message(embed=make_embed("💰 LANCE!", f"Leilão `{auction_id}`\n🏷️ {auction['item']}\n💰 Seu lance: {valor:,} Gold", 0x00ff00))
+
+# ============================================
+# 🏰 SISTEMA DE MASMORRAS
+# ============================================
+
+@bot.tree.command(name="masmorra_criar", description="🏰 Criar grupo de masmorra")
+@app_commands.describe(nome="Nome do grupo", nivel_min="Nível mínimo para entrar")
+async def masmorra_criar(i: discord.Interaction, nome: str, nivel_min: int = 1):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    dungeon_id = hashlib.md5(f"{i.user.id}{datetime.datetime.now()}".encode()).hexdigest()[:8]
+    bot.dungeons[dungeon_id] = {
+        'leader': i.user.id,
+        'name': nome,
+        'min_level': nivel_min,
+        'members': [i.user.id],
+        'status': 'recruiting',
+        'floor': 1,
+        'max_floor': 10,
+    }
+    
+    await i.response.send_message(embed=make_embed("🏰 MASMORRA CRIADA!", f"**{nome}**\n👑 Líder: {i.user.mention}\n⭐ Nível mínimo: {nivel_min}\n🚪 Andar atual: 1/10\n🆔 `{dungeon_id}`\n\nUse `/masmorra_entrar {dungeon_id}` para entrar!", 0x00ff00))
+
+@bot.tree.command(name="masmorra_entrar", description="🏰 Entrar em uma masmorra")
+@app_commands.describe(dungeon_id="ID da masmorra")
+async def masmorra_entrar(i: discord.Interaction, dungeon_id: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    dungeon = bot.dungeons.get(dungeon_id)
+    if not dungeon: return await i.response.send_message("❌ Masmorra não encontrada!", ephemeral=True)
+    if dungeon['status'] != 'recruiting': return await i.response.send_message("❌ Masmorra já em andamento!", ephemeral=True)
+    if p['level'] < dungeon['min_level']: return await i.response.send_message(f"❌ Nível {dungeon['min_level']} necessário!", ephemeral=True)
+    if i.user.id in dungeon['members']: return await i.response.send_message("❌ Você já está no grupo!", ephemeral=True)
+    
+    dungeon['members'].append(i.user.id)
+    await i.response.send_message(embed=make_embed("🏰 MASMORRA", f"{i.user.mention} entrou na masmorra **{dungeon['name']}**!\n👥 Membros: {len(dungeon['members'])}", 0x00ff00))
+
+@bot.tree.command(name="masmorra_avancar", description="🏰 Avançar andar da masmorra")
+@app_commands.describe(dungeon_id="ID da masmorra")
+async def masmorra_avancar(i: discord.Interaction, dungeon_id: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    dungeon = bot.dungeons.get(dungeon_id)
+    if not dungeon: return await i.response.send_message("❌ Masmorra não encontrada!", ephemeral=True)
+    if i.user.id != dungeon['leader']: return await i.response.send_message("❌ Apenas o líder pode avançar!", ephemeral=True)
+    if dungeon['floor'] >= dungeon['max_floor']: return await i.response.send_message("❌ Você já chegou ao último andar!", ephemeral=True)
+    
+    # Batalha contra monstro do andar
+    monster_hp = 500 * dungeon['floor']
+    monster_atk = 20 * dungeon['floor']
+    total_player_hp = sum(bot.get_player(uid)['hp'] for uid in dungeon['members'] if bot.get_player(uid))
+    
+    if total_player_hp > monster_hp * 0.3:
+        dungeon['floor'] += 1
+        reward_gold = 100 * dungeon['floor']
+        reward_xp = 50 * dungeon['floor']
+        
+        for uid in dungeon['members']:
+            member = bot.get_player(uid)
+            if member:
+                member['gold'] += reward_gold
+                member['xp'] += reward_xp
+        
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("🏰 ANDAR AVANÇADO!", f"**{dungeon['name']}**\n🚪 Andar: {dungeon['floor']}/{dungeon['max_floor']}\n💰 +{reward_gold} Gold por membro\n⭐ +{reward_xp} XP por membro", 0x00ff00))
+    else:
+        await i.response.send_message(embed=make_embed("❌ DERROTA!", "O grupo não foi forte o suficiente!", 0xff0000))
+
+# ============================================
+# ⚔️ SISTEMA DE PVP
+# ============================================
+
+@bot.tree.command(name="pvp", description="⚔️ Duelar com outro jogador")
+@app_commands.describe(adversario="Quem desafiar", aposta="Gold apostado")
+async def pvp(i: discord.Interaction, adversario: discord.User, aposta: int = 0):
+    p1 = bot.get_player(i.user.id)
+    p2 = bot.get_player(adversario.id)
+    if not p1 or not p2: return await i.response.send_message("❌ Ambos precisam ter personagem!", ephemeral=True)
+    if aposta < 0: return await i.response.send_message("❌ Aposta inválida!", ephemeral=True)
+    if aposta > 0:
+        if p1['gold'] < aposta: return await i.response.send_message("❌ Gold insuficiente!", ephemeral=True)
+        if p2['gold'] < aposta: return await i.response.send_message(f"❌ {adversario.name} não tem Gold!", ephemeral=True)
+        p1['gold'] -= aposta; p2['gold'] -= aposta
+    
+    p1_power = p1['atk'] + p1['def'] + p1['spd'] + (20 if p1.get('active_pet') else 0)
+    p2_power = p2['atk'] + p2['def'] + p2['spd'] + (20 if p2.get('active_pet') else 0)
+    
+    p1_roll = random.randint(1, p1_power)
+    p2_roll = random.randint(1, p2_power)
+    
+    if p1_roll > p2_roll:
+        winner, loser = p1, p2
+        winner_name, loser_name = i.user.mention, adversario.mention
+    else:
+        winner, loser = p2, p1
+        winner_name, loser_name = adversario.mention, i.user.mention
+    
+    if aposta > 0: winner['gold'] += aposta * 2
+    
+    p1['pvp_wins'] = p1.get('pvp_wins', 0) + (1 if winner == p1 else 0)
+    p1['pvp_losses'] = p1.get('pvp_losses', 0) + (1 if loser == p1 else 0)
+    p2['pvp_wins'] = p2.get('pvp_wins', 0) + (1 if winner == p2 else 0)
+    p2['pvp_losses'] = p2.get('pvp_losses', 0) + (1 if loser == p2 else 0)
+    
+    # Verifica título Deus da Guerra
+    for player in [p1, p2]:
+        if player.get('pvp_wins', 0) >= 50 and 'Deus da Guerra' not in player.get('titles', []):
+            player.setdefault('titles', []).append('Deus da Guerra')
+    
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("⚔️ PVP", f"{i.user.mention} ({p1_roll}) vs {adversario.mention} ({p2_roll})\n\n🏆 **{winner_name}** venceu!\n{'💰 Ganhou ' + str(aposta*2) + ' Gold!' if aposta > 0 else ''}", 0xffd700))
+
+# ============================================
+# 🤝 SISTEMA DE TRADE
+# ============================================
+
+@bot.tree.command(name="trade", description="🤝 Trocar itens/pets com outro jogador")
+@app_commands.describe(jogador="Jogador para trocar", seu_item="Seu item/pet", item_dele="Item/pet que você quer")
+async def trade(i: discord.Interaction, jogador: discord.User, seu_item: str, item_dele: str):
+    p1 = bot.get_player(i.user.id)
+    p2 = bot.get_player(jogador.id)
+    if not p1 or not p2: return await i.response.send_message("❌ Ambos precisam ter personagem!", ephemeral=True)
+    
+    if seu_item not in p1.get('inventory', []) and seu_item not in p1.get('pets', []) and seu_item not in p1.get('materials', {}):
+        return await i.response.send_message(f"❌ Você não tem **{seu_item}**!", ephemeral=True)
+    if item_dele not in p2.get('inventory', []) and item_dele not in p2.get('pets', []) and item_dele not in p2.get('materials', {}):
+        return await i.response.send_message(f"❌ {jogador.name} não tem **{item_dele}**!", ephemeral=True)
+    
+    trade_id = hashlib.md5(f"{i.user.id}{jogador.id}{datetime.datetime.now()}".encode()).hexdigest()[:8]
+    p1.setdefault('trades', []).append({'id': trade_id, 'with': jogador.id, 'give': seu_item, 'receive': item_dele, 'status': 'pending'})
+    bot.save_data()
+    
+    await i.response.send_message(embed=make_embed("🤝 TRADE", f"Trade `{trade_id}` criado!\n\n{i.user.mention} oferece: **{seu_item}**\nQuer receber: **{item_dele}**\n\n{jogador.mention} use `/aceitar_trade {trade_id}` para aceitar!", 0xffd700))
+
+@bot.tree.command(name="aceitar_trade", description="✅ Aceitar uma troca")
+@app_commands.describe(trade_id="ID da troca")
+async def aceitar_trade(i: discord.Interaction, trade_id: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    # Procura trade pendente
+    trade = None
+    other_uid = None
+    for uid, data in bot.players.items():
+        for t in data.get('trades', []):
+            if t['id'] == trade_id and t['status'] == 'pending' and t['with'] == i.user.id:
+                trade = t
+                other_uid = uid
+                break
+    
+    if not trade: return await i.response.send_message("❌ Trade não encontrado!", ephemeral=True)
+    
+    other_player = bot.get_player(int(other_uid))
+    if not other_player: return await i.response.send_message("❌ Jogador não encontrado!", ephemeral=True)
+    
+    # Realiza a troca
+    give_item = trade['give']
+    receive_item = trade['receive']
+    
+    # Remove do outro jogador
+    if give_item in other_player.get('inventory', []): other_player['inventory'].remove(give_item)
+    if give_item in other_player.get('pets', []): other_player['pets'].remove(give_item)
+    if give_item in other_player.get('materials', {}): del other_player['materials'][give_item]
+    
+    # Remove do jogador atual
+    if receive_item in p.get('inventory', []): p['inventory'].remove(receive_item)
+    if receive_item in p.get('pets', []): p['pets'].remove(receive_item)
+    if receive_item in p.get('materials', {}): del p['materials'][receive_item]
+    
+    # Adiciona ao jogador atual
+    if give_item not in ['']:
+        if give_item in ITEMS_CRAFT:
+            p.setdefault('inventory', []).append(give_item)
+        else:
+            p.setdefault('materials', {})[give_item] = p.get('materials', {}).get(give_item, 0) + 1
+    
+    # Adiciona ao outro jogador
+    if receive_item not in ['']:
+        if receive_item in ITEMS_CRAFT:
+            other_player.setdefault('inventory', []).append(receive_item)
+        else:
+            other_player.setdefault('materials', {})[receive_item] = other_player.get('materials', {}).get(receive_item, 0) + 1
+    
+    trade['status'] = 'completed'
+    bot.save_data()
+    
+    await i.response.send_message(embed=make_embed("✅ TRADE COMPLETO!", f"Trade `{trade_id}` concluído!", 0x00ff00))
+
+# ============================================
+# 🏦 SISTEMA DE BANCO
+# ============================================
+
+@bot.tree.command(name="banco", description="🏦 Depositar ou Sacar")
+@app_commands.describe(acao="Depositar ou Sacar", quantidade="Quantidade", tipo="Gold ou Gems")
+@app_commands.choices(acao=[app_commands.Choice(name="Depositar", value="dep"), app_commands.Choice(name="Sacar", value="sac")])
+@app_commands.choices(tipo=[app_commands.Choice(name="Gold", value="gold"), app_commands.Choice(name="Gems", value="gems")])
+async def banco(i: discord.Interaction, acao: str, quantidade: int, tipo: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    if quantidade <= 0: return await i.response.send_message("❌ Quantidade inválida!", ephemeral=True)
+    
+    bank_key = f"bank_{tipo}"
+    current_bank = p.get(bank_key, 0)
+    
+    if acao == "dep":
+        if p[tipo] < quantidade: return await i.response.send_message(f"❌ {tipo} insuficiente!", ephemeral=True)
+        p[tipo] -= quantidade
+        p[bank_key] = current_bank + quantidade
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("🏦 DEPÓSITO", f"Depositado **{quantidade:,} {tipo}**!\n🏦 Banco: {p[bank_key]:,} {tipo}", 0x00ff00))
+    else:
+        if current_bank < quantidade: return await i.response.send_message(f"❌ Saldo no banco insuficiente!", ephemeral=True)
+        p[bank_key] = current_bank - quantidade
+        p[tipo] += quantidade
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("🏧 SAQUE", f"Sacado **{quantidade:,} {tipo}**!\n💰 Agora: {p[tipo]:,} {tipo}", 0x00ff00))
+
+# ============================================
+# 🏰 SISTEMA DE GUILDAS
+# ============================================
+
+@bot.tree.command(name="guilda_criar", description="🏰 Criar uma guilda")
+@app_commands.describe(nome="Nome da guilda")
+async def guilda_criar(i: discord.Interaction, nome: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    if p.get('guild'): return await i.response.send_message("❌ Você já está em uma guilda!", ephemeral=True)
+    if p['gold'] < 1000: return await i.response.send_message("❌ 1.000 Gold necessário!", ephemeral=True)
+    if nome in bot._guilds: return await i.response.send_message("❌ Nome já existe!", ephemeral=True)
+    
+    p['gold'] -= 1000
+    bot._guilds[nome] = {'owner': i.user.id, 'members': [i.user.id], 'level': 1, 'gold': 0}
+    p['guild'] = nome
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🏰 GUILDA CRIADA!", f"**{nome}** foi fundada!\n👑 Líder: {i.user.mention}", 0xffd700))
+
+@bot.tree.command(name="guilda_entrar", description="🏰 Entrar em uma guilda")
+@app_commands.describe(nome="Nome da guilda")
+async def guilda_entrar(i: discord.Interaction, nome: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    if p.get('guild'): return await i.response.send_message("❌ Você já está em uma guilda!", ephemeral=True)
+    if nome not in bot._guilds: return await i.response.send_message("❌ Guilda não encontrada!", ephemeral=True)
+    
+    bot._guilds[nome]['members'].append(i.user.id)
+    p['guild'] = nome
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🏰 GUILDA", f"Você entrou na guilda **{nome}**!", 0x00ff00))
+
+# ============================================
+# 🛡️ PAINEL DE ADMIN
+# ============================================
+
+@bot.tree.command(name="admin", description="🛡️ [ADMIN] Painel de administração")
+async def admin(i: discord.Interaction):
+    if i.user.id != bot.DONO_ID:
+        return await i.response.send_message("❌ Apenas o DONO!", ephemeral=True)
+    
+    embed = make_embed("🛡️ PAINEL DE ADMIN", "`/admin_give` - Dar item\n`/admin_level` - Setar nível\n`/admin_gold` - Dar gold\n`/admin_material` - Dar material\n`/admin_egg` - Dar ovo\n`/admin_reset` - Resetar player", 0xff0000)
+    await i.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="admin_give", description="🛡️ [ADMIN] Dar item")
+@app_commands.describe(usuario="Jogador", item="Nome do item", quantidade="Quantidade")
+async def admin_give(i: discord.Interaction, usuario: discord.User, item: str, quantidade: int = 1):
+    if i.user.id != bot.DONO_ID: return await i.response.send_message("❌ Apenas o DONO!", ephemeral=True)
+    p = bot.get_player(usuario.id)
+    if not p: return await i.response.send_message("❌ Jogador não tem personagem!", ephemeral=True)
+    
+    for _ in range(quantidade):
+        p.setdefault('inventory', []).append(item)
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🛡️ ADMIN", f"✅ Dado **{quantidade}x {item}** para {usuario.mention}!", 0x00ff00), ephemeral=True)
+
+@bot.tree.command(name="admin_level", description="🛡️ [ADMIN] Setar nível")
+@app_commands.describe(usuario="Jogador", level="Novo nível")
+async def admin_level(i: discord.Interaction, usuario: discord.User, level: int):
+    if i.user.id != bot.DONO_ID: return await i.response.send_message("❌ Apenas o DONO!", ephemeral=True)
+    p = bot.get_player(usuario.id)
+    if not p: return await i.response.send_message("❌ Jogador não tem personagem!", ephemeral=True)
+    
+    level = max(1, min(375, level))
+    p['level'] = level
+    p['status_points'] = level * 2
+    p['max_hp'] = 100 + level * 10
+    p['max_mp'] = 50 + level * 5
+    p['hp'] = p['max_hp']
+    p['mp'] = p['max_mp']
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🛡️ ADMIN", f"✅ {usuario.mention} setado para nível **{level}**!", 0x00ff00), ephemeral=True)
+
+@bot.tree.command(name="admin_gold", description="🛡️ [ADMIN] Dar gold")
+@app_commands.describe(usuario="Jogador", quantidade="Quantidade")
+async def admin_gold(i: discord.Interaction, usuario: discord.User, quantidade: int):
+    if i.user.id != bot.DONO_ID: return await i.response.send_message("❌ Apenas o DONO!", ephemeral=True)
+    p = bot.get_player(usuario.id)
+    if not p: return await i.response.send_message("❌ Jogador não tem personagem!", ephemeral=True)
+    p['gold'] += quantidade
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🛡️ ADMIN", f"✅ Dado **{quantidade:,} Gold** para {usuario.mention}!", 0x00ff00), ephemeral=True)
+
+@bot.tree.command(name="admin_material", description="🛡️ [ADMIN] Dar material")
+@app_commands.describe(usuario="Jogador", material="Nome do material", quantidade="Quantidade")
+async def admin_material(i: discord.Interaction, usuario: discord.User, material: str, quantidade: int = 1):
+    if i.user.id != bot.DONO_ID: return await i.response.send_message("❌ Apenas o DONO!", ephemeral=True)
+    p = bot.get_player(usuario.id)
+    if not p: return await i.response.send_message("❌ Jogador não tem personagem!", ephemeral=True)
+    
+    p.setdefault('materials', {})
+    p['materials'][material] = p['materials'].get(material, 0) + quantidade
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🛡️ ADMIN", f"✅ Dado **{quantidade}x {material}** para {usuario.mention}!", 0x00ff00), ephemeral=True)
+
+@bot.tree.command(name="admin_egg", description="🛡️ [ADMIN] Dar ovo de pet")
+@app_commands.describe(usuario="Jogador", ovo="Tipo de ovo")
+@app_commands.choices(ovo=[
+    app_commands.Choice(name="🥚 Ovo Comum", value="Ovo Comum"),
+    app_commands.Choice(name="🥚 Ovo Raro", value="Ovo Raro"),
+    app_commands.Choice(name="🥚 Ovo Épico", value="Ovo Épico"),
+    app_commands.Choice(name="🥚 Ovo Lendário", value="Ovo Lendário"),
+    app_commands.Choice(name="🥚 Ovo Mítico", value="Ovo Mítico"),
+    app_commands.Choice(name="🥚 Ovo Supremo", value="Ovo Supremo"),
+])
+async def admin_egg(i: discord.Interaction, usuario: discord.User, ovo: str):
+    if i.user.id != bot.DONO_ID: return await i.response.send_message("❌ Apenas o DONO!", ephemeral=True)
+    p = bot.get_player(usuario.id)
+    if not p: return await i.response.send_message("❌ Jogador não tem personagem!", ephemeral=True)
+    
+    p.setdefault('pet_eggs', []).append(ovo)
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("🛡️ ADMIN", f"✅ Dado **{ovo}** para {usuario.mention}!", 0x00ff00), ephemeral=True)
+
+@bot.tree.command(name="admin_reset", description="🛡️ [ADMIN] Resetar um jogador")
+@app_commands.describe(usuario="Jogador")
+async def admin_reset(i: discord.Interaction, usuario: discord.User):
+    if i.user.id != bot.DONO_ID: return await i.response.send_message("❌ Apenas o DONO!", ephemeral=True)
+    
+    if str(usuario.id) in bot.players:
+        del bot.players[str(usuario.id)]
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("🛡️ ADMIN", f"✅ {usuario.mention} foi resetado!", 0x00ff00), ephemeral=True)
+    else:
+        await i.response.send_message("❌ Jogador não encontrado!", ephemeral=True)
+
+@bot.tree.command(name="status", description="📊 Distribuir pontos de status")
+@app_commands.describe(atributo="Qual atributo upar")
+@app_commands.choices(atributo=[
+    app_commands.Choice(name="💪 Força", value="forca"),
+    app_commands.Choice(name="🛡️ Defesa", value="defesa"),
+    app_commands.Choice(name="❤️ Vida", value="vida"),
+    app_commands.Choice(name="🔮 Magia", value="magia"),
+    app_commands.Choice(name="💎 Mana", value="mana"),
+    app_commands.Choice(name="💨 Agilidade", value="agilidade"),
+    app_commands.Choice(name="🍀 Sorte", value="sorte"),
+])
+async def status(i: discord.Interaction, atributo: str):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    points = p.get('status_points', 0)
+    if points <= 0:
+        return await i.response.send_message(f"❌ Você não tem pontos de status! Suba de nível para ganhar!", ephemeral=True)
+    
+    p.setdefault('stats', {})
+    p['stats'][atributo] = p['stats'].get(atributo, 5) + 1
+    p['status_points'] = points - 1
+    
+    s = p['stats']
+    p['atk'] = 10 + s.get('forca', 5) * 2 + s.get('agilidade', 5)
+    p['def'] = 5 + s.get('defesa', 5) * 2
+    p['spd'] = 5 + s.get('agilidade', 5) * 2
+    p['max_hp'] = 100 + s.get('vida', 10) * 10
+    p['max_mp'] = 50 + s.get('mana', 5) * 10 + s.get('magia', 5) * 5
+    p['hp'] = min(p['hp'], p['max_hp'])
+    p['mp'] = min(p['mp'], p['max_mp'])
+    
+    bot.save_data()
+    await i.response.send_message(embed=make_embed("📊 STATUS UP!", f"**{atributo.upper()}** aumentado para **{p['stats'][atributo]}**!\n⭐ Pontos restantes: {p['status_points']}", 0x00ff00))
+
+@bot.tree.command(name="titulos", description="🏅 Ver seus títulos e trocar título ativo")
+async def titulos(i: discord.Interaction):
+    p = bot.get_player(i.user.id)
+    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+    
+    titles = p.get('titles', ['Aventureiro'])
+    active = p.get('active_title', 'Aventureiro')
+    
+    desc = f"🏅 **Título Ativo:** {active}\n\n"
+    for t in titles:
+        bonus = TITLES.get(t, {}).get('bonus', {})
+        bonus_text = ", ".join([f"{'+' if v > 0 else ''}{v} {k}" for k, v in bonus.items()]) if bonus else "Sem bônus"
+        desc += f"• **{t}** - {bonus_text}\n"
+    
+    class TitleSelect(Select):
+        def __init__(self):
+            options = [discord.SelectOption(label=t, value=t) for t in titles[:25]]
+            super().__init__(placeholder="Escolha um título...", options=options)
+        
+        async def callback(self, interaction: discord.Interaction):
+            p['active_title'] = self.values[0]
+            bot.save_data()
+            await interaction.response.send_message(f"✅ Título alterado para **{self.values[0]}**!", ephemeral=True)
+    
+    view = View()
+    if len(titles) <= 25:
+        view.add_item(TitleSelect())
+    
+    await i.response.send_message(embed=make_embed("🏅 TÍTULOS", desc, 0xffd700), view=view)
 
 @bot.tree.command(name="craft", description="⚒️ Craftar um item")
 @app_commands.describe(item="Nome do item para craftar")
@@ -637,6 +1099,11 @@ async def craft(i: discord.Interaction, item: str):
     
     p.setdefault('inventory', []).append(item)
     p['crafts_made'] = p.get('crafts_made', 0) + 1
+    
+    # Verifica título Artesão Supremo
+    if p['crafts_made'] >= 50 and 'Artesão Supremo' not in p.get('titles', []):
+        p.setdefault('titles', []).append('Artesão Supremo')
+    
     bot.save_data()
     await i.response.send_message(embed=make_embed("⚒️ CRAFT COMPLETO!", f"Você craftou **{item}**!\n📝 {recipe['desc']}", 0x00ff00))
 
@@ -646,82 +1113,80 @@ async def receitas(i: discord.Interaction):
     if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
     
     desc = ""
-    for name, data in ITEMS_CRAFT.items():
+    for name, data in list(ITEMS_CRAFT.items())[:20]:
         if p['level'] >= data['level']:
-            mats = ", ".join([f"{v}x {k}" for k,v in data['materials'].items()])
+            mats = ", ".join([f"{v}x {k}" for k, v in data['materials'].items()])
             desc += f"**{name}** (Nv.{data['level']})\n📝 {data['desc']}\n⚒️ {mats}\n\n"
     
     await i.response.send_message(embed=make_embed("📋 RECEITAS", desc or "Nenhuma disponível", 0xffaa00))
 
-# ============================================
-# COMANDOS DE ILHAS
-# ============================================
-
-@bot.tree.command(name="ilhas", description="🗺️ Ver todas as ilhas")
-async def ilhas(i: discord.Interaction):
+@bot.tree.command(name="bau", description="🎁 Abrir um baú do tesouro")
+async def bau(i: discord.Interaction):
     p = bot.get_player(i.user.id)
     if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
     
-    desc = ""
-    for ilha in ISLANDS_FULL:
-        available = "✅" if p['level'] >= ilha['level'] and p['gold'] >= ilha['cost'] else "🔒"
-        desc += f"{available} **{ilha['name']}** (Nv.{ilha['level']})\n💰 {ilha['cost']} Gold | ⛏️ {', '.join(ilha['ores'][:2])}\n👹 Bosses: {', '.join(ilha['bosses']) or 'Nenhum'}\n\n"
-    
-    await i.response.send_message(embed=make_embed("🗺️ ILHAS", desc, 0x00ff00))
+    if random.random() < 0.3:
+        p['chests_opened'] = p.get('chests_opened', 0) + 1
+        
+        roll = random.random()
+        if roll < 0.0007: egg = 'Ovo Supremo'
+        elif roll < 0.0037: egg = 'Ovo Mítico'
+        elif roll < 0.0137: egg = 'Ovo Lendário'
+        elif roll < 0.0437: egg = 'Ovo Épico'
+        elif roll < 0.1237: egg = 'Ovo Raro'
+        else: egg = 'Ovo Comum'
+        
+        p.setdefault('pet_eggs', []).append(egg)
+        gold = random.randint(50, 500)
+        p['gold'] += gold
+        bot.save_data()
+        await i.response.send_message(embed=make_embed("🎁 BAÚ ENCONTRADO!", f"Você encontrou um baú!\n\n🥚 **{egg}**\n💰 **{gold} Gold**\n\nUse `/chocar` para chocar o ovo!", 0xffd700))
+    else:
+        await i.response.send_message(embed=make_embed("🔍 NADA...", "Você procurou mas não encontrou nenhum baú. Tente novamente!", 0xff0000))
 
-@bot.tree.command(name="viajar", description="🗺️ Viajar para uma ilha")
-@app_commands.describe(nome="Nome da ilha")
-async def viajar(i: discord.Interaction, nome: str):
-    p = bot.get_player(i.user.id)
-    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
+@bot.tree.command(name="evento_rpg", description="🎪 Ver evento aleatório atual")
+async def evento_rpg(i: discord.Interaction):
+    events = [
+        ("🌟 Bônus de XP", "Todos ganham +50% XP por 1 hora!"),
+        ("💰 Chuva de Gold", "Todos ganham +100 Gold!"),
+        ("🥚 Ovos Misteriosos", "Chance de achar ovos dobrada!"),
+        ("⚔️ Arena Livre", "PvP sem custo de aposta!"),
+        ("🛡️ Defesa Reforçada", "Todos ganham +20 DEF temporário!"),
+        ("🔥 Double Drop", "Drops de bosses duplicados!"),
+        ("💎 Gemas Raras", "Chance extra de achar gemas!"),
+    ]
     
-    ilha = next((il for il in ISLANDS_FULL if il['name'].lower() == nome.lower()), None)
-    if not ilha: return await i.response.send_message("❌ Ilha não encontrada!", ephemeral=True)
-    if p['level'] < ilha['level']: return await i.response.send_message(f"❌ Nível {ilha['level']} necessário!", ephemeral=True)
-    if p['gold'] < ilha['cost']: return await i.response.send_message(f"❌ {ilha['cost']} Gold necessário!", ephemeral=True)
-    
-    p['gold'] -= ilha['cost']
-    p['island'] = ilha['name']
-    bot.save_data()
-    await i.response.send_message(embed=make_embed("🗺️ VIAGEM", f"Você viajou para **{ilha['name']}**!\n💰 Custo: {ilha['cost']} Gold\n⛏️ Minérios: {', '.join(ilha['ores'])}", 0x00ff00))
+    event = random.choice(events)
+    await i.response.send_message(embed=make_embed("🎪 EVENTO ALEATÓRIO", f"**{event[0]}**\n📝 {event[1]}", 0xff00ff))
 
-@bot.tree.command(name="minerar", description="⛏️ Minerar na ilha atual")
-async def minerar(i: discord.Interaction):
-    p = bot.get_player(i.user.id)
-    if not p: return await i.response.send_message("❌ Use `/criar` primeiro!", ephemeral=True)
-    
-    ilha = next((il for il in ISLANDS_FULL if il['name'] == p.get('island', 'Ilha Inicial')), None)
-    if not ilha: return await i.response.send_message("❌ Ilha não encontrada!", ephemeral=True)
-    
-    ore = random.choice(ilha['ores'])
-    amount = random.randint(1, 5)
-    p.setdefault('materials', {})
-    p['materials'][ore] = p['materials'].get(ore, 0) + amount
-    bot.save_data()
-    await i.response.send_message(embed=make_embed("⛏️ MINERAR", f"Você minerou **{amount}x {ore}** na **{ilha['name']}**!", 0xffaa00))
 
 # ============================================
-# EVENTOS
+# EVENTOS FINAIS
 # ============================================
 
 @bot.event
 async def on_ready():
     print(f"""
 ╔══════════════════════════════════════╗
-║   ⚔️ EIDOLON GAMES - RPG ⚔️       ║
-║   1800+ LINES OF ADVENTURE         ║
+║   ⚔️ EIDOLON RPG v2.0 ⚔️          ║
+║   2500+ LINES OF ADVENTURE         ║
 ║   👑 Dono ID: {bot.DONO_ID}              ║
 ╚══════════════════════════════════════╝
     """)
     print(f"⚔️ Bot: {bot.user}")
     print(f"🎮 /criar - Comece sua aventura!")
-    print(f"⚒️ /craft - Craftar itens")
-    print(f"🗺️ /ilhas - Ver ilhas disponíveis")
-    await bot.change_presence(activity=discord.Game(name="⚔️ /criar | EIDOLON RPG"))
+    print(f"🏪 /leilao - Sistema de leilão")
+    print(f"🏰 /masmorra - Masmorras em grupo")
+    print(f"⚔️ /pvp - Duelar jogadores")
+    print(f"🤝 /trade - Trocar itens")
+    print(f"🏦 /banco - Depositar/Sacar")
+    print(f"🏰 /guilda - Guildas")
+    print(f"🛡️ /admin - Painel de Admin")
+    await bot.change_presence(activity=discord.Game(name="⚔️ /criar | EIDOLON RPG v2.0"))
 
 if __name__ == "__main__":
-    TOKEN = os.getenv("DISCORD_TOKEN")
-    print("⚔️ Iniciando EIDOLON RPG...\n")
+    TOKEN = os.getenv('DISCORD_TOKEN')
+    print("⚔️ Iniciando EIDOLON RPG v2.0...\n")
     try:
         bot.run(TOKEN)
     except discord.LoginFailure:
